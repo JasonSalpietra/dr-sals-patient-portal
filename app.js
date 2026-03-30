@@ -721,8 +721,6 @@ async function fetchPortalState(token) {
     cache: "no-store",
     headers: {
       Authorization: `Bearer ${String(token || "").trim()}`,
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache",
     },
   });
   const payload = await response.json().catch(() => ({}));
