@@ -176,6 +176,32 @@ function listItems(el, items) {
   }
 }
 
+function renderReminderItems(el, rows = [], showPatientLabel = false) {
+  if (!el) return;
+  if (!rows.length) {
+    listItems(el, ["No reminders available."]);
+    return;
+  }
+  el.innerHTML = rows
+    .map((row) => {
+      const labelParts = [row.type];
+      if (showPatientLabel) labelParts.unshift(row.patientName);
+      const title = labelParts.filter(Boolean).join(": ");
+      const due = row.dueDate ? `Due ${row.dueDate}` : "";
+      const administered = row.administeredDate ? `Administered ${row.administeredDate}` : "";
+      return `
+        <li class="reminder-item">
+          <div class="reminder-title">${esc(title)}</div>
+          <div class="reminder-meta">
+            ${due ? `<span class="reminder-pill">${esc(due)}</span>` : ""}
+            ${administered ? `<span class="reminder-pill">${esc(administered)}</span>` : ""}
+          </div>
+        </li>
+      `;
+    })
+    .join("");
+}
+
 function speciesLabel(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) return "Unknown";
@@ -423,8 +449,12 @@ function renderDashboardContent(records = [], scopeLabel = "Access scope unavail
       const reminderType = String(reminder?.type || "Reminder").trim() || "Reminder";
       const dueDate = formatUiDate(reminder?.dueDate) || String(reminder?.dueDate || "No due date");
       const administeredDate = formatUiDate(reminder?.lastCompletedDate);
-      const adminLabel = administeredDate ? ` | date administered ${administeredDate}` : "";
-      reminderRows.push(`${patientName}: ${reminderType} | due ${dueDate}${adminLabel}`);
+      reminderRows.push({
+        patientName,
+        type: reminderType,
+        dueDate,
+        administeredDate,
+      });
     }
 
     const notes = Array.isArray(record?.finalizedMedicalNotes) ? record.finalizedMedicalNotes : [];
@@ -447,7 +477,9 @@ function renderDashboardContent(records = [], scopeLabel = "Access scope unavail
     }
   }
 
-  listItems(remindersEl, reminderRows.length ? reminderRows.slice(0, 20) : ["No reminders available."]);
+  const reminderRowsLimited = reminderRows.slice(0, 20);
+  const reminderPatientCount = new Set(reminderRowsLimited.map((row) => row.patientName)).size;
+  renderReminderItems(remindersEl, reminderRowsLimited, reminderPatientCount > 1);
   listItems(finalizedNotesEl, finalizedNoteRows.length ? finalizedNoteRows.slice(0, 20) : ["No finalized medical notes available."]);
   listItems(patientInfoEl, patientInfoRows.length ? patientInfoRows.slice(0, 20) : ["No patient info available."]);
   listItems(clientRecordsEl, clientRecordRows.length ? clientRecordRows.slice(0, 20) : ["No client-provided records available."]);

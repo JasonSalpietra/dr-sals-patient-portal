@@ -188,6 +188,45 @@ ul {
   gap: 8px;
 }
 
+#reminders {
+  list-style: none;
+  padding-left: 0;
+  gap: 10px;
+}
+
+.reminder-item {
+  border: 1px solid rgba(12, 92, 184, 0.12);
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 10px 11px;
+}
+
+.reminder-title {
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+}
+
+.reminder-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reminder-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(10, 93, 184, 0.2);
+  color: #0a5db8;
+  background: #eaf3ff;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .export-panel {
   margin-top: 14px;
   padding: 22px;
