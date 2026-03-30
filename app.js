@@ -37,6 +37,9 @@ let selectedOwnerKey = "";
 let selectedPatientKey = "";
 let currentVetSignatures = [];
 let currentClientRecordAttachments = [];
+let currentAccessToken = "";
+let portalRefreshIntervalId = null;
+const PORTAL_REFRESH_MS = 30000;
 const CLINIC_PROFILE = {
   name: "Dr. Sal's Mobile Vet",
   streetAddress: "18016 Lanai Isle Dr.",
@@ -695,6 +698,11 @@ function showAuth() {
   dashboardView.classList.add("hidden");
   signOutBtn.classList.add("hidden");
   authView.classList.remove("hidden");
+  if (portalRefreshIntervalId) {
+    clearInterval(portalRefreshIntervalId);
+    portalRefreshIntervalId = null;
+  }
+  currentAccessToken = "";
   selectedOwnerKey = "";
   selectedPatientKey = "";
   currentPortalPayload = null;
@@ -710,8 +718,11 @@ function showAuth() {
 async function fetchPortalState(token) {
   const response = await fetch(`${ONECLICK_API_BASE}/api/patient-portal/state`, {
     method: "GET",
+    cache: "no-store",
     headers: {
       Authorization: `Bearer ${String(token || "").trim()}`,
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
     },
   });
   const payload = await response.json().catch(() => ({}));
@@ -743,9 +754,18 @@ async function signIn(email, password) {
 }
 
 async function hydrateFromToken(token) {
-  const payload = await fetchPortalState(token);
+  currentAccessToken = String(token || "").trim();
+  const payload = await fetchPortalState(currentAccessToken);
   renderDashboard(payload);
   showDashboard();
+  if (portalRefreshIntervalId) clearInterval(portalRefreshIntervalId);
+  portalRefreshIntervalId = setInterval(async () => {
+    if (!currentAccessToken || document.hidden) return;
+    try {
+      const nextPayload = await fetchPortalState(currentAccessToken);
+      renderDashboard(nextPayload);
+    } catch {}
+  }, PORTAL_REFRESH_MS);
 }
 
 async function exportStyledFormPdf({ filename, pageHtml }) {
@@ -1466,6 +1486,22 @@ signOutBtn.addEventListener("click", async () => {
   clearLoginMessage();
   loginForm.reset();
   showAuth();
+});
+
+document.addEventListener("visibilitychange", async () => {
+  if (document.hidden || !currentAccessToken || dashboardView.classList.contains("hidden")) return;
+  try {
+    const payload = await fetchPortalState(currentAccessToken);
+    renderDashboard(payload);
+  } catch {}
+});
+
+window.addEventListener("focus", async () => {
+  if (!currentAccessToken || dashboardView.classList.contains("hidden")) return;
+  try {
+    const payload = await fetchPortalState(currentAccessToken);
+    renderDashboard(payload);
+  } catch {}
 });
 
 (async function bootstrap() {
