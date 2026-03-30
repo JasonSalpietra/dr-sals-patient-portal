@@ -377,9 +377,17 @@ async function hydrateFromToken(token) {
 async function exportStyledFormPdf({ filename, pageHtml }) {
   if (!window.html2pdf) throw new Error("PDF library unavailable.");
   const mount = document.createElement("div");
-  mount.style.position = "fixed";
-  mount.style.left = "-9999px";
+  mount.style.position = "absolute";
+  mount.style.left = "0";
   mount.style.top = "0";
+  mount.style.opacity = "0";
+  mount.style.pointerEvents = "none";
+  mount.style.zIndex = "-1";
+  mount.style.width = "8.5in";
+  mount.style.padding = "0";
+  mount.style.margin = "0";
+  mount.style.boxSizing = "border-box";
+  mount.style.background = "#ffffff";
   mount.innerHTML = pageHtml;
   document.body.appendChild(mount);
   const page = mount.firstElementChild;
@@ -387,13 +395,21 @@ async function exportStyledFormPdf({ filename, pageHtml }) {
     mount.remove();
     throw new Error("Could not render export template.");
   }
+  page.style.margin = "0";
+  page.style.boxSizing = "border-box";
   try {
     await window.html2pdf()
       .set({
         margin: [0, 0, 0, 0],
         filename,
         image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          scrollX: 0,
+          scrollY: 0,
+        },
         jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
       })
       .from(page)
