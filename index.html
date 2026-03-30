@@ -23,7 +23,7 @@
           <p class="eyebrow">Dr Sals Mobile Vet</p>
           <h1>Patient Portal</h1>
           <p class="intro">
-            Secure place for pet parents to track visits, invoices, forms, and care notes.
+            Secure place for pet parents to track reminders, finalized records, diagnostics, and downloads.
           </p>
         </div>
         <button id="signOutBtn" class="ghost hidden" type="button">Sign Out</button>
@@ -75,10 +75,20 @@
             <ul id="diagnostics"></ul>
           </article>
         </div>
+
+        <article class="panel export-panel">
+          <h3>Record Exports</h3>
+          <p class="muted export-intro">
+            Download vaccine record, rabies certificate, or full medical record export for each patient.
+          </p>
+          <div id="recordExports" class="export-list"></div>
+        </article>
       </section>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script>
       window.ONECLICK_API_BASE =
         window.ONECLICK_API_BASE || "https://oneclick-backend-z163.onrender.com";
