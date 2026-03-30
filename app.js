@@ -212,12 +212,17 @@ function renderPatientInfoItems(el, rows = []) {
     .map((row) => {
       const title = row.ownerName ? `${row.patientName} (${row.ownerName})` : row.patientName;
       const signalment = [row.species, row.breed, row.sex].filter(Boolean).join(" | ") || "No signalment";
+      const dobAgeParts = [];
+      if (row.dobLabel) dobAgeParts.push(`DOB ${row.dobLabel}`);
+      if (row.ageLabel) dobAgeParts.push(`Age ${row.ageLabel}`);
+      const dobAge = dobAgeParts.join(" | ");
       const weight = row.weightLabel || "No recorded weight";
       return `
         <li class="patient-info-item">
           <div class="patient-info-title">${esc(title)}</div>
           <div class="patient-info-meta">
             <span class="patient-info-pill">${esc(signalment)}</span>
+            ${dobAge ? `<span class="patient-info-pill">${esc(dobAge)}</span>` : ""}
             <span class="patient-info-pill">${esc(weight)}</span>
           </div>
         </li>
@@ -460,10 +465,11 @@ function renderDashboardContent(records = [], scopeLabel = "Access scope unavail
     const breed = String(record?.breed || "").trim();
     const sex = String(record?.sex || "").trim();
     const latestWeightLbs = Number.parseFloat(record?.latestWeightLbs);
-    const latestWeightDate = String(record?.latestWeightDate || "").trim();
+    const dateOfBirth = String(record?.dateOfBirth || "").trim();
+    const age = String(record?.age || "").trim();
 
     const infoWeight = Number.isFinite(latestWeightLbs)
-      ? `${latestWeightLbs.toFixed(2)} lbs${latestWeightDate ? ` (${formatUiDate(latestWeightDate) || latestWeightDate})` : ""}`
+      ? `${latestWeightLbs.toFixed(2)} lbs`
       : "No recorded weight";
     patientInfoRows.push({
       patientName,
@@ -471,6 +477,8 @@ function renderDashboardContent(records = [], scopeLabel = "Access scope unavail
       species,
       breed,
       sex,
+      dobLabel: formatUiDate(dateOfBirth) || dateOfBirth,
+      ageLabel: age,
       weightLabel: infoWeight,
     });
 
