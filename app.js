@@ -37,6 +37,7 @@ let currentPortalPayload = null;
 let selectedOwnerKey = "";
 let selectedPatientKey = "";
 let currentVetSignatures = [];
+let currentClientRecordAttachments = [];
 const CLINIC_PROFILE = {
   name: "Dr. Sal's Mobile Vet",
   streetAddress: "18016 Lanai Isle Dr.",
@@ -252,17 +253,24 @@ function renderFinalizedNoteItems(el, rows = []) {
 
 function renderClientRecordItems(el, rows = []) {
   if (!el) return;
+  currentClientRecordAttachments = [];
   if (!rows.length) {
     listItems(el, ["No client-provided records available."]);
     return;
   }
   el.innerHTML = rows
-    .map((row) => `
-      <li class="section-item">
-        <div class="section-item-title">${esc(row.patientName)}</div>
-        <div class="section-item-body">${esc(row.recordName || "Client record")}</div>
-      </li>
-    `)
+    .map((row) => {
+      const attachment = row.attachment && typeof row.attachment === "object" ? row.attachment : null;
+      const hasDownload = Boolean(String(attachment?.dataUrl || "").trim());
+      const downloadIndex = hasDownload ? currentClientRecordAttachments.push(attachment) - 1 : -1;
+      return `
+        <li class="section-item">
+          <div class="section-item-title">${esc(row.patientName)}</div>
+          <div class="section-item-body">${esc(row.recordName || "Client record")}</div>
+          ${hasDownload ? `<div class="section-item-actions"><button class="ghost record-download-btn" data-client-record-index="${downloadIndex}" type="button">Download Record</button></div>` : ""}
+        </li>
+      `;
+    })
     .join("");
 }
 
@@ -559,12 +567,26 @@ function renderDashboardContent(records = [], scopeLabel = "Access scope unavail
       });
     }
 
-    const provided = Array.isArray(record?.clientProvidedRecords) ? record.clientProvidedRecords : [];
-    for (const item of provided) {
-      clientRecordRows.push({
-        patientName,
-        recordName: String(item || "Client record"),
-      });
+    const providedDetailed = Array.isArray(record?.clientProvidedRecordsDetailed)
+      ? record.clientProvidedRecordsDetailed
+      : [];
+    if (providedDetailed.length) {
+      for (const attachment of providedDetailed) {
+        clientRecordRows.push({
+          patientName,
+          recordName: String(attachment?.name || "Client record"),
+          attachment,
+        });
+      }
+    } else {
+      const provided = Array.isArray(record?.clientProvidedRecords) ? record.clientProvidedRecords : [];
+      for (const item of provided) {
+        clientRecordRows.push({
+          patientName,
+          recordName: String(item || "Client record"),
+          attachment: null,
+        });
+      }
     }
 
     const diagnostics = Array.isArray(record?.diagnostics) ? record.diagnostics : [];
@@ -1346,6 +1368,34 @@ if (recordExportsEl) {
       await runRecordExport(record, type);
     } catch (error) {
       setLoginError(String(error?.message || "Record export failed."));
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  });
+}
+
+if (clientRecordsEl) {
+  clientRecordsEl.addEventListener("click", async (event) => {
+    const button = event.target.closest("button[data-client-record-index]");
+    if (!button) return;
+    const index = Number.parseInt(button.dataset.clientRecordIndex || "", 10);
+    const attachment = Number.isFinite(index) ? currentClientRecordAttachments[index] : null;
+    if (!attachment) {
+      setLoginError("Record download failed: attachment not found.");
+      return;
+    }
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = "Preparing...";
+    clearLoginMessage();
+    try {
+      const blob = await getAttachmentBlob(attachment);
+      if (!blob) throw new Error("No downloadable file is attached to this record.");
+      const filename = sanitizeFilename(String(attachment?.name || "client-record"), "client-record");
+      downloadBlob(blob, filename);
+    } catch (error) {
+      setLoginError(String(error?.message || "Record download failed."));
     } finally {
       button.disabled = false;
       button.textContent = original;

@@ -314,6 +314,16 @@ ul {
   line-height: 1.4;
 }
 
+.section-item-actions {
+  margin-top: 8px;
+}
+
+.record-download-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 0.8rem;
+}
+
 .export-panel {
   margin-top: 14px;
   padding: 22px;
