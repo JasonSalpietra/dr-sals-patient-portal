@@ -210,7 +210,7 @@ function renderPatientInfoItems(el, rows = []) {
   }
   el.innerHTML = rows
     .map((row) => {
-      const title = row.ownerName ? `${row.patientName} (${row.ownerName})` : row.patientName;
+      const title = row.patientName;
       const signalment = [row.species, row.breed, row.sex].filter(Boolean).join(" | ") || "No signalment";
       const dobAgeParts = [];
       if (row.dobLabel) dobAgeParts.push(`DOB ${row.dobLabel}`);
