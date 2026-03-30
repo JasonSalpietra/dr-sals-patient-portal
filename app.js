@@ -24,8 +24,14 @@ const patientInfoEl = document.getElementById("patientInfo");
 const clientRecordsEl = document.getElementById("clientRecords");
 const diagnosticsEl = document.getElementById("diagnostics");
 const recordExportsEl = document.getElementById("recordExports");
+const ownerChooserEl = document.getElementById("ownerChooser");
+const ownerListEl = document.getElementById("ownerList");
+const ownerBackBtn = document.getElementById("ownerBackBtn");
+const ownerPortalContentEl = document.getElementById("ownerPortalContent");
 
 let currentRecords = [];
+let currentPortalPayload = null;
+let selectedOwnerKey = "";
 const CLINIC_PROFILE = {
   name: "Dr. Sal's Mobile Vet",
   streetAddress: "18016 Lanai Isle Dr.",
@@ -94,6 +100,32 @@ function formatPhone(raw = "") {
 function getPrimaryContact(client) {
   const contacts = Array.isArray(client?.contacts) ? client.contacts : [];
   return contacts.find((item) => item?.isPrimary) || contacts[0] || {};
+}
+
+function ownerDisplayNameForRecord(record = {}) {
+  const fromClientFirst = String(record?.client?.firstName || "").trim();
+  const fromClientLast = String(record?.client?.lastName || "").trim();
+  const fromClient = `${fromClientFirst} ${fromClientLast}`.trim();
+  const fromOwner = String(record?.ownerName || "").trim();
+  return fromClient || fromOwner || "Unknown owner";
+}
+
+function ownerKeyFor(value = "") {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function collectOwnerScopes(records = []) {
+  const owners = new Map();
+  for (const record of records) {
+    const ownerName = ownerDisplayNameForRecord(record);
+    const key = ownerKeyFor(ownerName);
+    if (!owners.has(key)) owners.set(key, { key, name: ownerName, records: [] });
+    owners.get(key).records.push(record);
+  }
+  return [...owners.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function listItems(el, items) {
@@ -240,8 +272,25 @@ function renderRecordExportRows(records) {
     .join("");
 }
 
-function renderDashboard(payload = {}) {
-  const records = Array.isArray(payload?.records) ? payload.records : [];
+function renderOwnerChooserRows(owners = []) {
+  if (!ownerListEl) return;
+  if (!owners.length) {
+    ownerListEl.innerHTML = "<p class='muted'>No owners found.</p>";
+    return;
+  }
+  ownerListEl.innerHTML = owners
+    .map(
+      (owner) => `
+        <button class="owner-select-btn" data-owner-key="${esc(owner.key)}" type="button">
+          <span class="owner-name">${esc(owner.name)}</span>
+          <span class="owner-meta">${owner.records.length} patient${owner.records.length === 1 ? "" : "s"}</span>
+        </button>
+      `,
+    )
+    .join("");
+}
+
+function renderDashboardContent(records = [], scopeLabel = "Access scope unavailable") {
   currentRecords = records;
 
   const reminderRows = [];
@@ -299,7 +348,40 @@ function renderDashboard(payload = {}) {
   listItems(diagnosticsEl, diagnosticRows.length ? diagnosticRows.slice(0, 20) : ["No diagnostics available."]);
 
   renderRecordExportRows(records);
-  accessScopeEl.textContent = String(payload?.scopeLabel || "Access scope unavailable");
+  accessScopeEl.textContent = String(scopeLabel || "Access scope unavailable");
+}
+
+function renderDashboard(payload = {}) {
+  currentPortalPayload = payload;
+  const records = Array.isArray(payload?.records) ? payload.records : [];
+  const scope = String(payload?.scope || "").trim().toLowerCase();
+  const scopeLabel = String(payload?.scopeLabel || "Access scope unavailable").trim();
+  const isMasterScope = scope === "all";
+  if (!isMasterScope) {
+    selectedOwnerKey = "";
+    if (ownerChooserEl) ownerChooserEl.classList.add("hidden");
+    if (ownerBackBtn) ownerBackBtn.classList.add("hidden");
+    if (ownerPortalContentEl) ownerPortalContentEl.classList.remove("hidden");
+    renderDashboardContent(records, scopeLabel);
+    return;
+  }
+
+  const owners = collectOwnerScopes(records);
+  const selectedOwner = owners.find((owner) => owner.key === selectedOwnerKey) || null;
+
+  if (!selectedOwner) {
+    if (ownerChooserEl) ownerChooserEl.classList.remove("hidden");
+    if (ownerBackBtn) ownerBackBtn.classList.add("hidden");
+    if (ownerPortalContentEl) ownerPortalContentEl.classList.add("hidden");
+    renderOwnerChooserRows(owners);
+    accessScopeEl.textContent = `${scopeLabel} | Select an owner to open portal view`;
+    return;
+  }
+
+  if (ownerChooserEl) ownerChooserEl.classList.add("hidden");
+  if (ownerBackBtn) ownerBackBtn.classList.remove("hidden");
+  if (ownerPortalContentEl) ownerPortalContentEl.classList.remove("hidden");
+  renderDashboardContent(selectedOwner.records, `Master access | ${selectedOwner.name}`);
 }
 
 function setLoginError(message) {
@@ -330,6 +412,12 @@ function showAuth() {
   dashboardView.classList.add("hidden");
   signOutBtn.classList.add("hidden");
   authView.classList.remove("hidden");
+  selectedOwnerKey = "";
+  currentPortalPayload = null;
+  currentRecords = [];
+  if (ownerChooserEl) ownerChooserEl.classList.add("hidden");
+  if (ownerBackBtn) ownerBackBtn.classList.add("hidden");
+  if (ownerPortalContentEl) ownerPortalContentEl.classList.remove("hidden");
   accessScopeEl.textContent = "";
 }
 
@@ -990,6 +1078,24 @@ if (recordExportsEl) {
       button.disabled = false;
       button.textContent = original;
     }
+  });
+}
+
+if (ownerListEl) {
+  ownerListEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-owner-key]");
+    if (!button) return;
+    selectedOwnerKey = ownerKeyFor(button.dataset.ownerKey || "");
+    if (!currentPortalPayload) return;
+    renderDashboard(currentPortalPayload);
+  });
+}
+
+if (ownerBackBtn) {
+  ownerBackBtn.addEventListener("click", () => {
+    selectedOwnerKey = "";
+    if (!currentPortalPayload) return;
+    renderDashboard(currentPortalPayload);
   });
 }
 

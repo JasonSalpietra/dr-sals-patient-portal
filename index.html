@@ -49,6 +49,17 @@
 
       <section id="dashboardView" class="dashboard hidden" aria-live="polite">
         <p id="accessScope" class="scope-note"></p>
+        <article id="ownerChooser" class="panel export-panel hidden">
+          <h3>Select Owner Account</h3>
+          <p class="muted export-intro">
+            Master access mode: choose an owner below to open their portal context.
+          </p>
+          <div id="ownerList" class="export-list"></div>
+        </article>
+
+        <button id="ownerBackBtn" class="ghost hidden" type="button">Back To Owner List</button>
+
+        <div id="ownerPortalContent">
         <div class="grid">
           <article class="panel card">
             <h3>Reminders</h3>
@@ -83,6 +94,7 @@
           </p>
           <div id="recordExports" class="export-list"></div>
         </article>
+        </div>
       </section>
     </main>
 
