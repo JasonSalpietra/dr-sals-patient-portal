@@ -672,17 +672,43 @@ function mapRecordToOneClickModel(record = {}) {
   const owner = String(record?.ownerName || "").trim();
   const [firstName, ...rest] = owner.split(/\s+/);
   const lastName = rest.join(" ");
-  const latestWeightLbs = Number.parseFloat(record?.latestWeightLbs);
+  const clientFromState = record?.client && typeof record.client === "object" ? record.client : {};
+  const finalizedVisits = Array.isArray(record?.finalizedVisits) ? record.finalizedVisits : [];
+  const detailedPriorRecords = Array.isArray(record?.clientProvidedRecordsDetailed)
+    ? record.clientProvidedRecordsDetailed
+    : [];
+  const reminders = Array.isArray(record?.reminders) ? record.reminders : [];
+  const normalizedReminders = reminders.map((item) => ({
+    ...item,
+    typeCode: String(item?.typeCode || item?.type || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_"),
+  }));
+  let visitsForPatient = finalizedVisits.map((visit) => ({
+    ...visit,
+    attachments: Array.isArray(visit?.attachments) ? visit.attachments : [],
+    vitals: visit?.vitals && typeof visit.vitals === "object" ? visit.vitals : {},
+    soap: visit?.soap && typeof visit.soap === "object" ? visit.soap : {},
+  }));
+  if (!visitsForPatient.length) {
+    const latestWeightLbs = Number.parseFloat(record?.latestWeightLbs);
+    visitsForPatient = Number.isFinite(latestWeightLbs)
+      ? [{ visitDate: String(record?.latestWeightDate || todayYmd()), vitals: { weightLbs: latestWeightLbs } }]
+      : [];
+  }
   return {
     client: {
-      firstName: firstName || owner || "Client",
-      lastName: lastName || "",
-      city: "",
-      state: "",
-      zip: "",
-      streetAddress: "",
-      email: "",
-      contacts: [{ name: owner || "Client", phone: "", isPrimary: true }],
+      firstName: String(clientFromState?.firstName || firstName || owner || "Client").trim(),
+      lastName: String(clientFromState?.lastName || lastName || "").trim(),
+      city: String(clientFromState?.city || "").trim(),
+      state: String(clientFromState?.state || "").trim(),
+      zip: String(clientFromState?.zip || "").trim(),
+      streetAddress: String(clientFromState?.streetAddress || "").trim(),
+      email: String(clientFromState?.email || "").trim(),
+      contacts: Array.isArray(clientFromState?.contacts)
+        ? clientFromState.contacts
+        : [{ name: owner || "Client", phone: "", isPrimary: true }],
     },
     patient: {
       name: String(record?.patientName || "Patient"),
@@ -695,94 +721,209 @@ function mapRecordToOneClickModel(record = {}) {
       color: String(record?.color || ""),
       microchipNumber: String(record?.microchipNumber || ""),
       microchipManufacturer: String(record?.microchipManufacturer || ""),
-      preventiveReminders: Array.isArray(record?.reminders)
-        ? record.reminders.map((item) => ({
-            ...item,
-            typeCode: String(item?.typeCode || item?.type || "").trim().toLowerCase().replace(/\s+/g, "_"),
-          }))
-        : [],
-      visits: Number.isFinite(latestWeightLbs)
-        ? [{ visitDate: String(record?.latestWeightDate || todayYmd()), vitals: { weightLbs: latestWeightLbs } }]
-        : [],
+      preventiveReminders: normalizedReminders,
+      priorRecords: detailedPriorRecords,
+      visits: visitsForPatient,
     },
   };
 }
 
-async function exportMedicalBundle(record) {
-  if (!window.JSZip) throw new Error("ZIP library unavailable.");
-  const zip = new window.JSZip();
-  const safeName = slugifyName(record.patientName || "patient");
+function sanitizeFilename(name, fallback = "attachment") {
+  const raw = String(name || "").trim();
+  const cleaned = raw
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return fallback;
+  return cleaned.length > 160 ? cleaned.slice(0, 160) : cleaned;
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function loadZipLibrary() {
+  if (!window.JSZip) throw new Error("JSZip unavailable.");
+  return window.JSZip;
+}
+
+function dataUrlToBlob(dataUrl = "") {
+  const match = String(dataUrl || "").match(/^data:([^;,]+)?(;base64)?,(.*)$/);
+  if (!match) return null;
+  const mime = match[1] || "application/octet-stream";
+  const encoded = match[3] || "";
+  const bytes = match[2] ? Uint8Array.from(atob(encoded), (ch) => ch.charCodeAt(0)) : Uint8Array.from(decodeURIComponent(encoded), (ch) => ch.charCodeAt(0));
+  return new Blob([bytes], { type: mime });
+}
+
+function attachmentBlobKeyFor(attachment = {}) {
+  return String(attachment?.blobKey || attachment?.attachmentId || "").trim();
+}
+
+async function getAttachmentBlob(attachment = {}) {
+  const dataUrl = String(attachment?.dataUrl || "").trim();
+  if (!dataUrl) return null;
+  return dataUrlToBlob(dataUrl);
+}
+
+function formatDateMmDdYyyy(value = "") {
+  const normalized = String(value || "").trim();
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return normalized;
+  return `${match[2]}-${match[3]}-${match[1]}`;
+}
+
+function ageYearsFromDob(dateOfBirth = "", referenceDateYmd = "") {
+  const dobRaw = String(dateOfBirth || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dobRaw)) return "";
+  const dob = new Date(`${dobRaw}T00:00:00`);
+  const refRaw = /^\d{4}-\d{2}-\d{2}$/.test(String(referenceDateYmd || "").trim())
+    ? String(referenceDateYmd)
+    : todayYmd();
+  const ref = new Date(`${refRaw}T00:00:00`);
+  if (Number.isNaN(dob.getTime()) || Number.isNaN(ref.getTime()) || ref < dob) return "";
+  let years = ref.getFullYear() - dob.getFullYear();
+  const mDiff = ref.getMonth() - dob.getMonth();
+  if (mDiff < 0 || (mDiff === 0 && ref.getDate() < dob.getDate())) years -= 1;
+  if (years < 0) return "";
+  return `${years} year${years === 1 ? "" : "s"}`;
+}
+
+function reportValue(value = "") {
+  const normalized = String(value || "").trim();
+  return normalized ? esc(normalized).replace(/\n/g, "<br>") : "Not documented";
+}
+
+function reportWeightLabel(visit, patient) {
+  const fromVisit = Number.parseFloat(visit?.vitals?.weightLbs);
+  if (Number.isFinite(fromVisit)) return `${fromVisit.toFixed(1)} lb`;
+  const latest = latestPatientWeightLabel(patient);
+  return latest || "Not documented";
+}
+
+function resolveAttendingVetLabel(visit) {
+  const directKeys = [
+    "attendingVet",
+    "attendingVetName",
+    "provider",
+    "providerName",
+    "doctor",
+    "doctorName",
+    "veterinarian",
+    "veterinarianName",
+    "vetName",
+  ];
+  for (const key of directKeys) {
+    const value = String(visit?.[key] || "").trim();
+    if (value) return value;
+  }
+  const editedBy = String(visit?.lastEditedBy || "").trim();
+  if (editedBy && !/^user$/i.test(editedBy)) return editedBy;
+  return "Not documented";
+}
+
+function renderMedicalSummaryReportHtml({ client, patient, visit }) {
+  const primary = getPrimaryContact(client);
+  const clientName = String(primary?.name || `${client?.firstName || ""} ${client?.lastName || ""}` || "").trim() || "Unknown client";
+  const clientPhone = formatPhone(primary?.phone || "") || "Not documented";
+  const clientEmail = String(client?.email || "").trim() || "Not documented";
+  const species = String(patient?.species || "").trim() || "Not documented";
+  const breed = String(patient?.breed || "").trim();
+  const speciesBreed = breed ? `${species} / ${breed}` : species;
+  const sex = String(patient?.sex || "").trim() || "Not documented";
+  const dob = String(patient?.dateOfBirth || "").trim();
+  const age = ageYearsFromDob(dob, visit?.visitDate || "");
+  const dobLabel = dob ? `${formatDateMmDdYyyy(dob)}${age ? ` (${age})` : ""}` : "Not documented";
+  const microchip = String(patient?.microchipNumber || "").trim() || "Not documented";
+  const weight = reportWeightLabel(visit, patient);
+  const visitDateLabel = formatDateMmDdYyyy(String(visit?.visitDate || "").trim()) || "Not documented";
+  const attendingVet = resolveAttendingVetLabel(visit);
+  const subjective = reportValue(visit?.soap?.subjective || "");
+  const objective = reportValue(visit?.soap?.objective || "");
+  const assessment = reportValue(visit?.soap?.assessment || "");
+  const plan = reportValue(visit?.soap?.plan || "");
+  return `<!doctype html>
+<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Medical Summary Report - ${esc(patient?.name || "Patient")}</title>
+<style>:root { --ink:#1c2530; --line:#95a1ad; --header:#e2ecf6; --accent:#0f766e; }* { box-sizing:border-box; }body { margin:0; padding:18px; background:#fff; color:var(--ink); font-family:"Avenir Next","Segoe UI",Arial,sans-serif; }.page { width:8.5in; min-height:11in; margin:0 auto; box-sizing:border-box; border:1px solid #ccd4db; padding:0.38in; }.header { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; border-bottom:2px solid var(--accent); padding-bottom:10px; margin-bottom:12px; }.title { margin:0; font-size:26px; line-height:1.15; letter-spacing:0.2px; }.subtitle { margin:4px 0 0; font-size:12px; text-transform:uppercase; letter-spacing:0.9px; color:#334155; font-weight:700; }.meta-pill { border:1px solid var(--line); background:#f8fcff; padding:8px 10px; font-size:11px; min-width:2in; text-align:right; }.meta-pill strong { display:block; font-size:14px; color:#0b4f7a; }.clinic { font-size:11px; line-height:1.4; margin-bottom:12px; }.client-brief { border:1px dashed #c6d0da; background:#fbfdff; padding:6px 8px; font-size:10px; color:#64748b; margin-bottom:10px; line-height:1.35; }.section { border:1px solid #748495; margin-bottom:10px; }.section-title { background:var(--header); border-bottom:1px solid #748495; padding:7px 9px; font-size:11px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; }.grid-3 { display:grid; grid-template-columns:repeat(3, 1fr); }.field { border-right:1px solid #cad3dc; border-bottom:1px solid #cad3dc; padding:7px 8px; min-height:52px; background:#fff; }.grid-3 .field:nth-child(3n) { border-right:none; }.k { font-size:9px; color:#64748b; text-transform:uppercase; letter-spacing:0.4px; font-weight:700; margin-bottom:3px; }.v { font-size:12px; font-weight:600; white-space:pre-wrap; line-height:1.35; }.block { border-top:1px solid #cad3dc; padding:8px 10px; background:#fff; min-height:90px; }.block:first-of-type { border-top:none; }.block-label { font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; font-weight:700; margin-bottom:5px; }.block-value { font-size:12px; line-height:1.45; white-space:pre-wrap; }</style>
+</head><body><div class="page"><header class="header"><div><h1 class="title">Medical Summary Report</h1><p class="subtitle">${esc(CLINIC_PROFILE.name || "Dr. Sal's Mobile Vet")}</p></div><div class="meta-pill">Visit Date<strong>${esc(visitDateLabel)}</strong></div></header>
+<div class="clinic"><strong>${esc(CLINIC_PROFILE.name || "Dr. Sal's Mobile Vet")}</strong><br>${esc(CLINIC_PROFILE.streetAddress || "")}<br>${esc(CLINIC_PROFILE.cityStateZip || "")}<br>${esc(CLINIC_PROFILE.phone || "")}${CLINIC_PROFILE.email ? ` | ${esc(CLINIC_PROFILE.email)}` : ""}</div>
+<div class="client-brief">Client reference: ${esc(clientName)} | ${esc(clientPhone)} | ${esc(clientEmail)}</div>
+<section class="section"><div class="section-title">Pet Signalment</div><div class="grid-3"><div class="field"><div class="k">Patient Name</div><div class="v">${reportValue(patient?.name)}</div></div><div class="field"><div class="k">Species / Breed</div><div class="v">${reportValue(speciesBreed)}</div></div><div class="field"><div class="k">Sex</div><div class="v">${reportValue(sex)}</div></div><div class="field"><div class="k">DOB</div><div class="v">${reportValue(dobLabel)}</div></div><div class="field"><div class="k">Microchip #</div><div class="v">${reportValue(microchip)}</div></div><div class="field"><div class="k">Weight</div><div class="v">${reportValue(weight)}</div></div></div></section>
+<section class="section"><div class="section-title">Medical Summary</div><div class="block"><div class="block-label">History</div><div class="block-value">${subjective}</div></div><div class="block"><div class="block-label">Physical Exam</div><div class="block-value">${objective}</div></div><div class="block"><div class="block-label">Assessment</div><div class="block-value">${assessment}</div></div><div class="block"><div class="block-label">Plan</div><div class="block-value">${plan}</div></div></section>
+<section class="section"><div class="section-title">Attending Vet</div><div class="grid-3"><div class="field"><div class="k">Veterinarian</div><div class="v">${reportValue(attendingVet)}</div></div></div></section>
+</div></body></html>`;
+}
+
+async function exportPatientBundle({ client, patient, visits, priorRecords = [] }) {
+  const JSZip = await loadZipLibrary();
+  const byNewestDate = (a, b, key) => String(b?.[key] || "").localeCompare(String(a?.[key] || ""));
+  const sortedVisits = [...visits].sort((a, b) => byNewestDate(a, b, "visitDate"));
+  const sortedPriorRecords = [...priorRecords].sort((a, b) => byNewestDate(a, b, "linkedAt"));
+  const zip = new JSZip();
   const ownerRecordsFolder = zip.folder("Owner Provided Medical Records");
   const summaryReportsFolder = zip.folder("Dr. Sal's Medical Summary Reports");
   const imagesFolder = zip.folder("Images");
-
-  const notes = Array.isArray(record.finalizedMedicalNotes) ? record.finalizedMedicalNotes : [];
-  const reminders = Array.isArray(record.reminders) ? record.reminders : [];
-  const diagnostics = Array.isArray(record.diagnostics) ? record.diagnostics : [];
-  const providedRecords = Array.isArray(record.clientProvidedRecords) ? record.clientProvidedRecords : [];
-
-  for (const [index, note] of notes.entries()) {
-    const dateLabel = String(note?.visitDate || `unknown-${index + 1}`).replace(/[^0-9-]/g, "") || `unknown-${index + 1}`;
-    const html = `<!doctype html>
-<html lang="en">
-<head><meta charset="UTF-8" /><title>Medical Summary ${esc(record.patientName || "Patient")}</title></head>
-<body style="font-family: Arial, sans-serif; padding: 16px;">
-  <h1>Medical Summary Report</h1>
-  <p><strong>Clinic:</strong> ${esc(CLINIC_PROFILE.name)}</p>
-  <p><strong>Owner:</strong> ${esc(record.ownerName || "")}</p>
-  <p><strong>Patient:</strong> ${esc(record.patientName || "")}</p>
-  <p><strong>Visit Date:</strong> ${esc(formatDate(note?.visitDate || ""))}</p>
-  <hr />
-  <p>${esc(String(note?.summary || "")).replace(/\n/g, "<br />")}</p>
-</body>
-</html>`;
-    summaryReportsFolder.file(`${dateLabel}-medical-summary-${index + 1}.html`, html);
+  const usedNames = new Set();
+  const uniqueName = (folderName, filename) => {
+    const ext = filename.includes(".") ? filename.slice(filename.lastIndexOf(".")) : "";
+    const base = ext ? filename.slice(0, -ext.length) : filename;
+    let candidate = filename;
+    let n = 2;
+    while (usedNames.has(`${folderName}/${candidate}`)) {
+      candidate = `${base}-${n}${ext}`;
+      n += 1;
+    }
+    usedNames.add(`${folderName}/${candidate}`);
+    return candidate;
+  };
+  const addAttachmentFile = async (attachment, folder, folderName, prefix) => {
+    if (!attachment) return;
+    const blob = await getAttachmentBlob(attachment);
+    if (!blob) return;
+    const baseName = sanitizeFilename(attachment.name, `${prefix}-attachment`);
+    const filename = uniqueName(folderName, `${prefix}-${baseName}`);
+    folder.file(filename, blob);
+  };
+  const addTextFile = (folder, folderName, filename, content) => {
+    const candidate = uniqueName(folderName, filename);
+    folder.file(candidate, content);
+  };
+  const isImageAttachment = (attachment) => String(attachment?.type || "").toLowerCase().startsWith("image/");
+  for (const record of sortedPriorRecords) {
+    await addAttachmentFile(record, ownerRecordsFolder, "Owner Provided Medical Records", "owner-record");
   }
-
-  if (!notes.length) {
-    summaryReportsFolder.file("no-finalized-visits.txt", "No finalized visits available for export.");
+  for (const [index, visit] of sortedVisits.entries()) {
+    const reportHtml = renderMedicalSummaryReportHtml({ client, patient, visit });
+    const safeDate = String(visit.visitDate || "unknown-date").replace(/[^0-9-]/g, "");
+    const dateLabel = formatDateMmDdYyyy(safeDate || "unknown-date").replace(/[^0-9-]/g, "");
+    const reportFilename = `${dateLabel || "unknown-date"}-medical-summary-${index + 1}.html`;
+    addTextFile(summaryReportsFolder, "Dr. Sal's Medical Summary Reports", reportFilename, reportHtml);
   }
-
-  if (providedRecords.length) {
-    ownerRecordsFolder.file(
-      "owner-record-list.txt",
-      providedRecords.map((item) => `- ${item}`).join("\n"),
-    );
-  } else {
-    ownerRecordsFolder.file("no-owner-records.txt", "No owner-provided records available.");
+  const imageAttachments = [
+    ...sortedPriorRecords.filter(isImageAttachment),
+    ...sortedVisits
+      .flatMap((visit) =>
+        (visit.attachments || []).map((attachment) => ({
+          ...attachment,
+          linkedAt: attachment.linkedAt || visit.visitDate || "",
+        })),
+      )
+      .filter(isImageAttachment),
+  ].sort((a, b) => byNewestDate(a, b, "linkedAt"));
+  for (const imageAttachment of imageAttachments) {
+    await addAttachmentFile(imageAttachment, imagesFolder, "Images", "image");
   }
-
-  imagesFolder.file("readme.txt", "Image attachments are not yet synced to patient portal exports.");
-
-  zip.file(
-    "patient-summary.txt",
-    [
-      `Owner: ${record.ownerName || ""}`,
-      `Patient: ${record.patientName || ""}`,
-      `Species: ${record.species || ""}`,
-      `Breed: ${record.breed || ""}`,
-      `Sex: ${record.sex || ""}`,
-      `DOB: ${record.dateOfBirth || ""}`,
-      `Weight (latest): ${record.latestWeightLbs || ""} lbs on ${record.latestWeightDate || ""}`,
-      "",
-      "Reminders",
-      ...(reminders.map((item) => `- ${item.type || "Reminder"}: given=${item.lastCompletedDate || "—"}, due=${item.dueDate || "—"}, status=${item.status || "active"}`) || ["- none"]),
-      "",
-      "Diagnostics",
-      ...(diagnostics.map((item) => `- ${item.visitDate || "Unknown"}: ${item.label || "Diagnostic"} -> ${item.result || "Result pending"}`) || ["- none"]),
-    ].join("\n"),
-  );
-
-  zip.file("records.json", JSON.stringify(record, null, 2));
-  const blob = await zip.generateAsync({ type: "blob" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `medical-record-export-${safeName}.zip`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  const zipBlob = await zip.generateAsync({ type: "blob" });
+  const patientSlug = slugifyName(patient.name);
+  downloadBlob(zipBlob, `patient-export-${patientSlug}.zip`);
 }
 
 async function runRecordExport(record, type) {
@@ -799,7 +940,12 @@ async function runRecordExport(record, type) {
     return;
   }
   if (type === "medical") {
-    await exportMedicalBundle(record);
+    await exportPatientBundle({
+      client: mapped.client,
+      patient: mapped.patient,
+      visits: Array.isArray(mapped?.patient?.visits) ? mapped.patient.visits : [],
+      priorRecords: Array.isArray(mapped?.patient?.priorRecords) ? mapped.patient.priorRecords : [],
+    });
     return;
   }
   throw new Error("Unknown export action.");
