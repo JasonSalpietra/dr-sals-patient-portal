@@ -83,6 +83,13 @@ function formatDisplayDate(value = "") {
   return `${match[2]}-${match[3]}-${match[1]}`;
 }
 
+function formatUiDate(value = "") {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "";
+  const justDate = normalized.includes("T") ? normalized.slice(0, 10) : normalized;
+  return formatDisplayDate(justDate);
+}
+
 function formatPdfDate(value = "") {
   const normalized = String(value || "").trim();
   if (!normalized) return "";
@@ -358,21 +365,21 @@ function renderDashboardContent(records = [], scopeLabel = "Access scope unavail
 
     const infoSignalment = [species, breed, sex].filter(Boolean).join(" | ") || "No signalment";
     const infoWeight = Number.isFinite(latestWeightLbs)
-      ? `${latestWeightLbs.toFixed(2)} lbs${latestWeightDate ? ` (${latestWeightDate})` : ""}`
+      ? `${latestWeightLbs.toFixed(2)} lbs${latestWeightDate ? ` (${formatUiDate(latestWeightDate) || latestWeightDate})` : ""}`
       : "No recorded weight";
     patientInfoRows.push(`${patientName} (${ownerName}): ${infoSignalment} | Weight: ${infoWeight}`);
 
     const reminders = Array.isArray(record?.reminders) ? record.reminders : [];
     for (const reminder of reminders) {
       reminderRows.push(
-        `${patientName}: ${String(reminder?.type || "Reminder")} | due ${String(reminder?.dueDate || "No due date")} | ${String(reminder?.status || "active")}`,
+        `${patientName}: ${String(reminder?.type || "Reminder")} | due ${formatUiDate(reminder?.dueDate) || String(reminder?.dueDate || "No due date")} | ${String(reminder?.status || "active")}`,
       );
     }
 
     const notes = Array.isArray(record?.finalizedMedicalNotes) ? record.finalizedMedicalNotes : [];
     for (const note of notes) {
       finalizedNoteRows.push(
-        `${patientName}: ${String(note?.visitDate || "Unknown date")} | ${String(note?.summary || "No note summary")}`,
+        `${patientName}: ${formatUiDate(note?.visitDate) || String(note?.visitDate || "Unknown date")} | ${String(note?.summary || "No note summary")}`,
       );
     }
 
@@ -384,7 +391,7 @@ function renderDashboardContent(records = [], scopeLabel = "Access scope unavail
     const diagnostics = Array.isArray(record?.diagnostics) ? record.diagnostics : [];
     for (const diagnostic of diagnostics) {
       diagnosticRows.push(
-        `${patientName}: ${String(diagnostic?.visitDate || "Unknown date")} | ${String(diagnostic?.label || "Diagnostic")} | ${String(diagnostic?.result || "Result pending")}`,
+        `${patientName}: ${formatUiDate(diagnostic?.visitDate) || String(diagnostic?.visitDate || "Unknown date")} | ${String(diagnostic?.label || "Diagnostic")} | ${String(diagnostic?.result || "Result pending")}`,
       );
     }
   }
