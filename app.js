@@ -193,8 +193,8 @@ function renderReminderItems(el, rows = [], showPatientLabel = false) {
         <li class="reminder-item">
           <div class="reminder-title">${esc(title)}</div>
           <div class="reminder-meta">
-            ${due ? `<span class="reminder-pill">${esc(due)}</span>` : ""}
             ${administered ? `<span class="reminder-pill">${esc(administered)}</span>` : ""}
+            ${due ? `<span class="reminder-pill">${esc(due)}</span>` : ""}
           </div>
         </li>
       `;
