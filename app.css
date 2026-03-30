@@ -156,12 +156,6 @@ input {
   margin-top: 16px;
 }
 
-.scope-note {
-  margin: 0 0 12px;
-  color: var(--blue-dark);
-  font-weight: 800;
-}
-
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

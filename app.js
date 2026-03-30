@@ -14,7 +14,6 @@ const dashboardView = document.getElementById("dashboardView");
 const signOutBtn = document.getElementById("signOutBtn");
 const loginForm = document.getElementById("loginForm");
 const loginMessageEl = document.getElementById("loginMessage");
-const accessScopeEl = document.getElementById("accessScope");
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
 
@@ -512,7 +511,7 @@ function renderPatientChooserRows(patients = []) {
     .join("");
 }
 
-function renderDashboardContent(records = [], scopeLabel = "Access scope unavailable") {
+function renderDashboardContent(records = []) {
   currentRecords = records;
 
   const reminderRows = [];
@@ -609,10 +608,9 @@ function renderDashboardContent(records = [], scopeLabel = "Access scope unavail
   renderDiagnosticItems(diagnosticsEl, diagnosticRows.slice(0, 20));
 
   renderRecordExportRows(records);
-  accessScopeEl.textContent = String(scopeLabel || "Access scope unavailable");
 }
 
-function renderPatientSelectionFlow(records = [], scopeLabel = "Access scope unavailable") {
+function renderPatientSelectionFlow(records = []) {
   const patients = collectPatientScopes(records);
   const selectedPatient = patients.find((patient) => patient.key === selectedPatientKey) || null;
   if (!selectedPatient) {
@@ -621,13 +619,12 @@ function renderPatientSelectionFlow(records = [], scopeLabel = "Access scope una
     if (patientBackBtn) patientBackBtn.classList.add("hidden");
     if (ownerPortalContentEl) ownerPortalContentEl.classList.add("hidden");
     renderPatientChooserRows(patients);
-    accessScopeEl.textContent = `${scopeLabel} | Select a patient`;
     return;
   }
   if (patientChooserEl) patientChooserEl.classList.add("hidden");
   if (patientBackBtn) patientBackBtn.classList.remove("hidden");
   if (ownerPortalContentEl) ownerPortalContentEl.classList.remove("hidden");
-  renderDashboardContent(selectedPatient.records, `${scopeLabel} | Patient: ${selectedPatient.name}`);
+  renderDashboardContent(selectedPatient.records);
 }
 
 function renderDashboard(payload = {}) {
@@ -635,7 +632,6 @@ function renderDashboard(payload = {}) {
   currentVetSignatures = normalizeVetSignatureList(payload?.vetSignatures || []);
   const records = Array.isArray(payload?.records) ? payload.records : [];
   const scope = String(payload?.scope || "").trim().toLowerCase();
-  const scopeLabel = String(payload?.scopeLabel || "Access scope unavailable").trim();
   const isMasterScope = scope === "all";
   if (!isMasterScope) {
     selectedOwnerKey = "";
@@ -644,7 +640,7 @@ function renderDashboard(payload = {}) {
     }
     if (ownerChooserEl) ownerChooserEl.classList.add("hidden");
     if (ownerBackBtn) ownerBackBtn.classList.add("hidden");
-    renderPatientSelectionFlow(records, scopeLabel);
+    renderPatientSelectionFlow(records);
     return;
   }
 
@@ -659,7 +655,6 @@ function renderDashboard(payload = {}) {
     if (patientBackBtn) patientBackBtn.classList.add("hidden");
     if (ownerPortalContentEl) ownerPortalContentEl.classList.add("hidden");
     renderOwnerChooserRows(owners);
-    accessScopeEl.textContent = `${scopeLabel} | Select an owner to open portal view`;
     return;
   }
 
@@ -669,7 +664,7 @@ function renderDashboard(payload = {}) {
   }
   if (ownerChooserEl) ownerChooserEl.classList.add("hidden");
   if (ownerBackBtn) ownerBackBtn.classList.remove("hidden");
-  renderPatientSelectionFlow(selectedOwner.records, `Master access | ${selectedOwner.name}`);
+  renderPatientSelectionFlow(selectedOwner.records);
 }
 
 function setLoginError(message) {
@@ -710,7 +705,6 @@ function showAuth() {
   if (patientChooserEl) patientChooserEl.classList.add("hidden");
   if (patientBackBtn) patientBackBtn.classList.add("hidden");
   if (ownerPortalContentEl) ownerPortalContentEl.classList.remove("hidden");
-  accessScopeEl.textContent = "";
 }
 
 async function fetchPortalState(token) {
