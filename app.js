@@ -461,7 +461,7 @@ function renderRecordExportRows(records) {
       (record, index) => `
         <div class="export-row">
           <div class="export-row-head">
-            <strong>${esc(record.patientName)} (${esc(record.ownerName)})</strong>
+            <strong>${esc(record.patientName)}</strong>
             <span class="muted">${esc([record.species, record.breed].filter(Boolean).join(" | ") || "No species/breed")}</span>
           </div>
           <div class="export-actions">
