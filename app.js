@@ -421,7 +421,10 @@ function renderDashboardContent(records = [], scopeLabel = "Access scope unavail
     const reminders = Array.isArray(record?.reminders) ? record.reminders : [];
     for (const reminder of reminders) {
       const reminderType = String(reminder?.type || "Reminder").trim() || "Reminder";
-      reminderRows.push(`${patientName}: ${reminderType}`);
+      const dueDate = formatUiDate(reminder?.dueDate) || String(reminder?.dueDate || "No due date");
+      const administeredDate = formatUiDate(reminder?.lastCompletedDate);
+      const adminLabel = administeredDate ? ` | date administered ${administeredDate}` : "";
+      reminderRows.push(`${patientName}: ${reminderType} | due ${dueDate}${adminLabel}`);
     }
 
     const notes = Array.isArray(record?.finalizedMedicalNotes) ? record.finalizedMedicalNotes : [];
