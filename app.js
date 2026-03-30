@@ -202,6 +202,30 @@ function renderReminderItems(el, rows = [], showPatientLabel = false) {
     .join("");
 }
 
+function renderPatientInfoItems(el, rows = []) {
+  if (!el) return;
+  if (!rows.length) {
+    listItems(el, ["No patient info available."]);
+    return;
+  }
+  el.innerHTML = rows
+    .map((row) => {
+      const title = row.ownerName ? `${row.patientName} (${row.ownerName})` : row.patientName;
+      const signalment = [row.species, row.breed, row.sex].filter(Boolean).join(" | ") || "No signalment";
+      const weight = row.weightLabel || "No recorded weight";
+      return `
+        <li class="patient-info-item">
+          <div class="patient-info-title">${esc(title)}</div>
+          <div class="patient-info-meta">
+            <span class="patient-info-pill">${esc(signalment)}</span>
+            <span class="patient-info-pill">${esc(weight)}</span>
+          </div>
+        </li>
+      `;
+    })
+    .join("");
+}
+
 function speciesLabel(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) return "Unknown";
@@ -438,11 +462,17 @@ function renderDashboardContent(records = [], scopeLabel = "Access scope unavail
     const latestWeightLbs = Number.parseFloat(record?.latestWeightLbs);
     const latestWeightDate = String(record?.latestWeightDate || "").trim();
 
-    const infoSignalment = [species, breed, sex].filter(Boolean).join(" | ") || "No signalment";
     const infoWeight = Number.isFinite(latestWeightLbs)
       ? `${latestWeightLbs.toFixed(2)} lbs${latestWeightDate ? ` (${formatUiDate(latestWeightDate) || latestWeightDate})` : ""}`
       : "No recorded weight";
-    patientInfoRows.push(`${patientName} (${ownerName}): ${infoSignalment} | Weight: ${infoWeight}`);
+    patientInfoRows.push({
+      patientName,
+      ownerName,
+      species,
+      breed,
+      sex,
+      weightLabel: infoWeight,
+    });
 
     const reminders = Array.isArray(record?.reminders) ? record.reminders : [];
     for (const reminder of reminders) {
@@ -481,7 +511,7 @@ function renderDashboardContent(records = [], scopeLabel = "Access scope unavail
   const reminderPatientCount = new Set(reminderRowsLimited.map((row) => row.patientName)).size;
   renderReminderItems(remindersEl, reminderRowsLimited, reminderPatientCount > 1);
   listItems(finalizedNotesEl, finalizedNoteRows.length ? finalizedNoteRows.slice(0, 20) : ["No finalized medical notes available."]);
-  listItems(patientInfoEl, patientInfoRows.length ? patientInfoRows.slice(0, 20) : ["No patient info available."]);
+  renderPatientInfoItems(patientInfoEl, patientInfoRows.slice(0, 20));
   listItems(clientRecordsEl, clientRecordRows.length ? clientRecordRows.slice(0, 20) : ["No client-provided records available."]);
   listItems(diagnosticsEl, diagnosticRows.length ? diagnosticRows.slice(0, 20) : ["No diagnostics available."]);
 
