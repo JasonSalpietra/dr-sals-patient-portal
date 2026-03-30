@@ -200,6 +200,14 @@ ul {
   gap: 10px;
 }
 
+#finalizedNotes,
+#clientRecords,
+#diagnostics {
+  list-style: none;
+  padding-left: 0;
+  gap: 10px;
+}
+
 .reminder-item {
   border: 1px solid rgba(12, 92, 184, 0.12);
   border-radius: 12px;
@@ -264,6 +272,46 @@ ul {
   background: #eaf3ff;
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.section-item {
+  border: 1px solid rgba(12, 92, 184, 0.12);
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 10px 11px;
+}
+
+.section-item-title {
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+}
+
+.section-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.section-item-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(10, 93, 184, 0.2);
+  color: #0a5db8;
+  background: #eaf3ff;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.section-item-body {
+  color: var(--muted);
+  font-size: 0.89rem;
+  line-height: 1.4;
 }
 
 .export-panel {

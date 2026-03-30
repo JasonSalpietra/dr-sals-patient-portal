@@ -231,6 +231,61 @@ function renderPatientInfoItems(el, rows = []) {
     .join("");
 }
 
+function renderFinalizedNoteItems(el, rows = []) {
+  if (!el) return;
+  if (!rows.length) {
+    listItems(el, ["No finalized medical notes available."]);
+    return;
+  }
+  el.innerHTML = rows
+    .map((row) => `
+      <li class="section-item">
+        <div class="section-item-title">${esc(row.patientName)}</div>
+        <div class="section-item-meta">
+          <span class="section-item-pill">${esc(`Visit ${row.visitDate || "Unknown date"}`)}</span>
+        </div>
+        <div class="section-item-body">${esc(row.summary || "No note summary")}</div>
+      </li>
+    `)
+    .join("");
+}
+
+function renderClientRecordItems(el, rows = []) {
+  if (!el) return;
+  if (!rows.length) {
+    listItems(el, ["No client-provided records available."]);
+    return;
+  }
+  el.innerHTML = rows
+    .map((row) => `
+      <li class="section-item">
+        <div class="section-item-title">${esc(row.patientName)}</div>
+        <div class="section-item-body">${esc(row.recordName || "Client record")}</div>
+      </li>
+    `)
+    .join("");
+}
+
+function renderDiagnosticItems(el, rows = []) {
+  if (!el) return;
+  if (!rows.length) {
+    listItems(el, ["No diagnostics available."]);
+    return;
+  }
+  el.innerHTML = rows
+    .map((row) => `
+      <li class="section-item">
+        <div class="section-item-title">${esc(row.patientName)}</div>
+        <div class="section-item-meta">
+          <span class="section-item-pill">${esc(row.label || "Diagnostic")}</span>
+          <span class="section-item-pill">${esc(`Date ${row.visitDate || "Unknown"}`)}</span>
+        </div>
+        <div class="section-item-body">${esc(row.result || "Result pending")}</div>
+      </li>
+    `)
+    .join("");
+}
+
 function speciesLabel(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) return "Unknown";
@@ -497,31 +552,39 @@ function renderDashboardContent(records = [], scopeLabel = "Access scope unavail
 
     const notes = Array.isArray(record?.finalizedMedicalNotes) ? record.finalizedMedicalNotes : [];
     for (const note of notes) {
-      finalizedNoteRows.push(
-        `${patientName}: ${formatUiDate(note?.visitDate) || String(note?.visitDate || "Unknown date")} | ${String(note?.summary || "No note summary")}`,
-      );
+      finalizedNoteRows.push({
+        patientName,
+        visitDate: formatUiDate(note?.visitDate) || String(note?.visitDate || "Unknown date"),
+        summary: String(note?.summary || "No note summary"),
+      });
     }
 
     const provided = Array.isArray(record?.clientProvidedRecords) ? record.clientProvidedRecords : [];
     for (const item of provided) {
-      clientRecordRows.push(`${patientName}: ${String(item || "Client record")}`);
+      clientRecordRows.push({
+        patientName,
+        recordName: String(item || "Client record"),
+      });
     }
 
     const diagnostics = Array.isArray(record?.diagnostics) ? record.diagnostics : [];
     for (const diagnostic of diagnostics) {
-      diagnosticRows.push(
-        `${patientName}: ${formatUiDate(diagnostic?.visitDate) || String(diagnostic?.visitDate || "Unknown date")} | ${String(diagnostic?.label || "Diagnostic")} | ${String(diagnostic?.result || "Result pending")}`,
-      );
+      diagnosticRows.push({
+        patientName,
+        visitDate: formatUiDate(diagnostic?.visitDate) || String(diagnostic?.visitDate || "Unknown date"),
+        label: String(diagnostic?.label || "Diagnostic"),
+        result: String(diagnostic?.result || "Result pending"),
+      });
     }
   }
 
   const reminderRowsLimited = reminderRows.slice(0, 20);
   const reminderPatientCount = new Set(reminderRowsLimited.map((row) => row.patientName)).size;
   renderReminderItems(remindersEl, reminderRowsLimited, reminderPatientCount > 1);
-  listItems(finalizedNotesEl, finalizedNoteRows.length ? finalizedNoteRows.slice(0, 20) : ["No finalized medical notes available."]);
+  renderFinalizedNoteItems(finalizedNotesEl, finalizedNoteRows.slice(0, 20));
   renderPatientInfoItems(patientInfoEl, patientInfoRows.slice(0, 20));
-  listItems(clientRecordsEl, clientRecordRows.length ? clientRecordRows.slice(0, 20) : ["No client-provided records available."]);
-  listItems(diagnosticsEl, diagnosticRows.length ? diagnosticRows.slice(0, 20) : ["No diagnostics available."]);
+  renderClientRecordItems(clientRecordsEl, clientRecordRows.slice(0, 20));
+  renderDiagnosticItems(diagnosticsEl, diagnosticRows.slice(0, 20));
 
   renderRecordExportRows(records);
   accessScopeEl.textContent = String(scopeLabel || "Access scope unavailable");
