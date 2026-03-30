@@ -32,6 +32,7 @@ const ownerPortalContentEl = document.getElementById("ownerPortalContent");
 let currentRecords = [];
 let currentPortalPayload = null;
 let selectedOwnerKey = "";
+let currentVetSignatures = [];
 const CLINIC_PROFILE = {
   name: "Dr. Sal's Mobile Vet",
   streetAddress: "18016 Lanai Isle Dr.",
@@ -161,13 +162,60 @@ function speciesLabelForCertificate(value = "") {
 }
 
 function normalizeVetSignatureName(value = "") {
-  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function normalizeVetLicense(value = "") {
+  return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function normalizeVetSignatureEntry(rawEntry = {}) {
+  const name = String(rawEntry?.name || "").trim();
+  const signatureImageDataUrl = String(rawEntry?.signatureImageDataUrl || "").trim();
+  return {
+    vetId: String(rawEntry?.vetId || "").trim(),
+    name,
+    licenseNumber: String(rawEntry?.licenseNumber || "").trim(),
+    signatureImageDataUrl,
+  };
+}
+
+function normalizeVetSignatureList(rawList = []) {
+  if (!Array.isArray(rawList)) return [];
+  const seenNames = new Set();
+  const normalized = [];
+  for (const rawEntry of rawList) {
+    const entry = normalizeVetSignatureEntry(rawEntry);
+    if (!entry.name || !entry.signatureImageDataUrl) continue;
+    const key = normalizeVetSignatureName(entry.name);
+    if (!key || seenNames.has(key)) continue;
+    seenNames.add(key);
+    normalized.push(entry);
+  }
+  return normalized;
+}
+
+function findVetSignatureByName(name = "") {
+  const needle = normalizeVetSignatureName(name);
+  if (!needle) return null;
+  return currentVetSignatures.find((entry) => normalizeVetSignatureName(entry.name) === needle) || null;
 }
 
 function findVetSignatureForCertificate({ name = "", licenseNumber = "" } = {}) {
-  const needleName = normalizeVetSignatureName(name);
-  const needleLicense = String(licenseNumber || "").trim().toLowerCase();
-  if (!needleName && !needleLicense) return null;
+  const rows = Array.isArray(currentVetSignatures) ? currentVetSignatures : [];
+  if (!rows.length) return null;
+  const normalizedLicense = normalizeVetLicense(licenseNumber);
+  if (normalizedLicense) {
+    const byLicense = rows.find((entry) => normalizeVetLicense(entry.licenseNumber) === normalizedLicense);
+    if (byLicense) return byLicense;
+  }
+  const byName = findVetSignatureByName(name);
+  if (byName) return byName;
+  if (rows.length === 1) return rows[0];
   return null;
 }
 
@@ -353,6 +401,7 @@ function renderDashboardContent(records = [], scopeLabel = "Access scope unavail
 
 function renderDashboard(payload = {}) {
   currentPortalPayload = payload;
+  currentVetSignatures = normalizeVetSignatureList(payload?.vetSignatures || []);
   const records = Array.isArray(payload?.records) ? payload.records : [];
   const scope = String(payload?.scope || "").trim().toLowerCase();
   const scopeLabel = String(payload?.scopeLabel || "Access scope unavailable").trim();
@@ -415,6 +464,7 @@ function showAuth() {
   selectedOwnerKey = "";
   currentPortalPayload = null;
   currentRecords = [];
+  currentVetSignatures = [];
   if (ownerChooserEl) ownerChooserEl.classList.add("hidden");
   if (ownerBackBtn) ownerBackBtn.classList.add("hidden");
   if (ownerPortalContentEl) ownerPortalContentEl.classList.remove("hidden");
@@ -658,6 +708,8 @@ function renderRabiesCertificatePage({ client, patient }) {
       "",
   ).trim();
   const signatureImageDataUrl = String(matchedVetSignature?.signatureImageDataUrl || "").trim();
+  const reminderSignatureImageDataUrl = String(rabiesReminder?.vaccineVetSignatureImageDataUrl || "").trim();
+  const resolvedSignatureImageDataUrl = reminderSignatureImageDataUrl || signatureImageDataUrl;
   const certificateVetName = String(
     rabiesAdministeredBy || matchedVetSignature?.name || CLINIC_PROFILE.vaccinator || "",
   ).trim();
@@ -749,8 +801,8 @@ function renderRabiesCertificatePage({ client, patient }) {
 
         <div style="border:1px solid #9aa9ba;padding:10px 10px 8px;font-size:11.2px;">
           <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.45px;color:#5f6d7c;font-weight:700;margin-bottom:6px;">Veterinarian Signature</div>
-          ${signatureImageDataUrl
-            ? `<div style="border-bottom:1px solid #5f6d7c;height:34px;margin-bottom:6px;display:flex;align-items:flex-end;"><img src="${esc(signatureImageDataUrl)}" alt="Veterinarian signature" style="max-height:30px;max-width:100%;object-fit:contain;" /></div>`
+          ${resolvedSignatureImageDataUrl
+            ? `<div style="border-bottom:1px solid #5f6d7c;height:34px;margin-bottom:6px;display:flex;align-items:flex-end;"><img src="${esc(resolvedSignatureImageDataUrl)}" alt="Veterinarian signature" style="max-height:30px;max-width:100%;object-fit:contain;" /></div>`
             : `<div style="border-bottom:1px solid #5f6d7c;height:26px;margin-bottom:6px;"></div>`
           }
           <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px;">
