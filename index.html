@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Patient Portal | Dr Sals</title>
+    <meta
+      name="description"
+      content="Patient portal for appointments, billing, secure messages, and records."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header panel">
+        <div>
+          <p class="eyebrow">Dr Sals Mobile Vet</p>
+          <h1>Patient Portal</h1>
+          <p class="intro">
+            Secure place for pet parents to track visits, invoices, forms, and care notes.
+          </p>
+        </div>
+        <button id="signOutBtn" class="ghost hidden" type="button">Sign Out</button>
+      </header>
+
+      <section id="authView" class="panel auth-view">
+        <h2>Sign In</h2>
+        <p class="muted">Demo starter for portal UX. Backend auth will be connected next.</p>
+
+        <form id="loginForm" class="auth-form">
+          <label>
+            Email
+            <input id="email" type="email" placeholder="you@domain.com" required />
+          </label>
+          <label>
+            Password
+            <input id="password" type="password" placeholder="••••••••" required />
+          </label>
+          <button class="primary" type="submit">Access Portal</button>
+        </form>
+      </section>
+
+      <section id="dashboardView" class="dashboard hidden" aria-live="polite">
+        <div class="grid">
+          <article class="panel card">
+            <h3>Upcoming Appointments</h3>
+            <ul id="appointments"></ul>
+          </article>
+
+          <article class="panel card">
+            <h3>Billing Snapshot</h3>
+            <div id="billing"></div>
+          </article>
+
+          <article class="panel card">
+            <h3>Secure Messages</h3>
+            <ul id="messages"></ul>
+          </article>
+
+          <article class="panel card">
+            <h3>Documents</h3>
+            <ul id="documents"></ul>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
