@@ -712,19 +712,47 @@ async function exportMedicalBundle(record) {
   if (!window.JSZip) throw new Error("ZIP library unavailable.");
   const zip = new window.JSZip();
   const safeName = slugifyName(record.patientName || "patient");
+  const ownerRecordsFolder = zip.folder("Owner Provided Medical Records");
+  const summaryReportsFolder = zip.folder("Dr. Sal's Medical Summary Reports");
+  const imagesFolder = zip.folder("Images");
 
-  const notes = (Array.isArray(record.finalizedMedicalNotes) ? record.finalizedMedicalNotes : [])
-    .map((item) => `- ${item.visitDate || "Unknown"}: ${item.summary || ""}`)
-    .join("\n");
-  const reminders = (Array.isArray(record.reminders) ? record.reminders : [])
-    .map((item) => `- ${item.type || "Reminder"}: given=${item.lastCompletedDate || "—"}, due=${item.dueDate || "—"}, status=${item.status || "active"}`)
-    .join("\n");
-  const diagnostics = (Array.isArray(record.diagnostics) ? record.diagnostics : [])
-    .map((item) => `- ${item.visitDate || "Unknown"}: ${item.label || "Diagnostic"} -> ${item.result || "Result pending"}`)
-    .join("\n");
-  const records = (Array.isArray(record.clientProvidedRecords) ? record.clientProvidedRecords : [])
-    .map((item) => `- ${item}`)
-    .join("\n");
+  const notes = Array.isArray(record.finalizedMedicalNotes) ? record.finalizedMedicalNotes : [];
+  const reminders = Array.isArray(record.reminders) ? record.reminders : [];
+  const diagnostics = Array.isArray(record.diagnostics) ? record.diagnostics : [];
+  const providedRecords = Array.isArray(record.clientProvidedRecords) ? record.clientProvidedRecords : [];
+
+  for (const [index, note] of notes.entries()) {
+    const dateLabel = String(note?.visitDate || `unknown-${index + 1}`).replace(/[^0-9-]/g, "") || `unknown-${index + 1}`;
+    const html = `<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8" /><title>Medical Summary ${esc(record.patientName || "Patient")}</title></head>
+<body style="font-family: Arial, sans-serif; padding: 16px;">
+  <h1>Medical Summary Report</h1>
+  <p><strong>Clinic:</strong> ${esc(CLINIC_PROFILE.name)}</p>
+  <p><strong>Owner:</strong> ${esc(record.ownerName || "")}</p>
+  <p><strong>Patient:</strong> ${esc(record.patientName || "")}</p>
+  <p><strong>Visit Date:</strong> ${esc(formatDate(note?.visitDate || ""))}</p>
+  <hr />
+  <p>${esc(String(note?.summary || "")).replace(/\n/g, "<br />")}</p>
+</body>
+</html>`;
+    summaryReportsFolder.file(`${dateLabel}-medical-summary-${index + 1}.html`, html);
+  }
+
+  if (!notes.length) {
+    summaryReportsFolder.file("no-finalized-visits.txt", "No finalized visits available for export.");
+  }
+
+  if (providedRecords.length) {
+    ownerRecordsFolder.file(
+      "owner-record-list.txt",
+      providedRecords.map((item) => `- ${item}`).join("\n"),
+    );
+  } else {
+    ownerRecordsFolder.file("no-owner-records.txt", "No owner-provided records available.");
+  }
+
+  imagesFolder.file("readme.txt", "Image attachments are not yet synced to patient portal exports.");
 
   zip.file(
     "patient-summary.txt",
@@ -737,17 +765,11 @@ async function exportMedicalBundle(record) {
       `DOB: ${record.dateOfBirth || ""}`,
       `Weight (latest): ${record.latestWeightLbs || ""} lbs on ${record.latestWeightDate || ""}`,
       "",
-      "Finalized Medical Notes",
-      notes || "- none",
-      "",
       "Reminders",
-      reminders || "- none",
+      ...(reminders.map((item) => `- ${item.type || "Reminder"}: given=${item.lastCompletedDate || "—"}, due=${item.dueDate || "—"}, status=${item.status || "active"}`) || ["- none"]),
       "",
       "Diagnostics",
-      diagnostics || "- none",
-      "",
-      "Client-Provided Records",
-      records || "- none",
+      ...(diagnostics.map((item) => `- ${item.visitDate || "Unknown"}: ${item.label || "Diagnostic"} -> ${item.result || "Result pending"}`) || ["- none"]),
     ].join("\n"),
   );
 
