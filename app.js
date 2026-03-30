@@ -18,10 +18,11 @@ const accessScopeEl = document.getElementById("accessScope");
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
 
-const appointmentsEl = document.getElementById("appointments");
-const billingEl = document.getElementById("billing");
-const messagesEl = document.getElementById("messages");
-const documentsEl = document.getElementById("documents");
+const remindersEl = document.getElementById("reminders");
+const finalizedNotesEl = document.getElementById("finalizedNotes");
+const patientInfoEl = document.getElementById("patientInfo");
+const clientRecordsEl = document.getElementById("clientRecords");
+const diagnosticsEl = document.getElementById("diagnostics");
 
 function listItems(el, items) {
   el.innerHTML = "";
@@ -32,117 +33,80 @@ function listItems(el, items) {
   }
 }
 
-function dollarsFromCents(value) {
-  const cents = Number.parseInt(value, 10);
-  if (!Number.isFinite(cents)) return "$0.00";
-  return `$${(cents / 100).toFixed(2)}`;
-}
+function renderDashboard(payload = {}) {
+  const records = Array.isArray(payload?.records) ? payload.records : [];
+  const reminderRows = [];
+  const finalizedNoteRows = [];
+  const patientInfoRows = [];
+  const clientRecordRows = [];
+  const diagnosticRows = [];
 
-function isoDateOrEmpty(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toISOString().slice(0, 10);
-}
+  for (const record of records) {
+    const ownerName = String(record?.ownerName || "Unknown owner").trim();
+    const patientName = String(record?.patientName || "Unnamed patient").trim();
+    const species = String(record?.species || "").trim();
+    const breed = String(record?.breed || "").trim();
+    const sex = String(record?.sex || "").trim();
+    const latestWeightLbs = Number.parseFloat(record?.latestWeightLbs);
+    const latestWeightDate = String(record?.latestWeightDate || "").trim();
 
-function computeVisitDueCents(visit = {}) {
-  const estimateCents = Number.parseInt(visit?.estimate?.amountCents, 10);
-  const paidCents = Number.parseInt(visit?.payment?.amountPaidCents, 10);
-  const estimate = Number.isFinite(estimateCents) && estimateCents > 0 ? estimateCents : 0;
-  const paid = Number.isFinite(paidCents) && paidCents > 0 ? paidCents : 0;
-  return Math.max(0, estimate - paid);
-}
+    const infoSignalment = [species, breed, sex].filter(Boolean).join(" | ") || "No signalment";
+    const infoWeight = Number.isFinite(latestWeightLbs)
+      ? `${latestWeightLbs.toFixed(2)} lbs${latestWeightDate ? ` (${latestWeightDate})` : ""}`
+      : "No recorded weight";
+    patientInfoRows.push(`${patientName} (${ownerName}): ${infoSignalment} | Weight: ${infoWeight}`);
 
-function getPatientRows(state = {}) {
-  const clients = Array.isArray(state?.clients) ? state.clients : [];
-  const rows = [];
-  for (const client of clients) {
-    const owner = `${String(client?.firstName || "").trim()} ${String(client?.lastName || "").trim()}`.trim() ||
-      "Unknown owner";
-    const patients = Array.isArray(client?.patients) ? client.patients : [];
-    for (const patient of patients) {
-      rows.push({ client, patient, owner });
-    }
-  }
-  return rows;
-}
-
-function getLatestVisit(patient = {}) {
-  const visits = Array.isArray(patient?.visits) ? [...patient.visits] : [];
-  visits.sort((a, b) => {
-    const aDate = isoDateOrEmpty(a?.visitDate);
-    const bDate = isoDateOrEmpty(b?.visitDate);
-    if (!aDate && !bDate) return 0;
-    if (!aDate) return 1;
-    if (!bDate) return -1;
-    return bDate.localeCompare(aDate);
-  });
-  return visits[0] || null;
-}
-
-function renderDashboardFromState(payload = {}) {
-  const state = payload?.state && typeof payload.state === "object" ? payload.state : {};
-  const rows = getPatientRows(state);
-
-  const appointmentRows = [];
-  const messageRows = [];
-  const documentRows = [];
-  const billingRows = [];
-
-  for (const row of rows) {
-    const patientName = String(row.patient?.name || "Unnamed patient").trim() || "Unnamed patient";
-    const latestVisit = getLatestVisit(row.patient);
-
-    if (latestVisit) {
-      appointmentRows.push(
-        `${String(latestVisit.visitDate || "Unknown date")}: ${patientName} (${row.owner})`,
+    const reminders = Array.isArray(record?.reminders) ? record.reminders : [];
+    for (const reminder of reminders) {
+      reminderRows.push(
+        `${patientName}: ${String(reminder?.type || "Reminder")} | due ${String(
+          reminder?.dueDate || "No due date",
+        )} | ${String(reminder?.status || "active")}`,
       );
-      const dueCents = computeVisitDueCents(latestVisit);
-      billingRows.push(
-        `${patientName}: Balance ${dollarsFromCents(dueCents)} | Last visit ${String(
-          latestVisit.visitDate || "Unknown",
+    }
+
+    const notes = Array.isArray(record?.finalizedMedicalNotes)
+      ? record.finalizedMedicalNotes
+      : [];
+    for (const note of notes) {
+      finalizedNoteRows.push(
+        `${patientName}: ${String(note?.visitDate || "Unknown date")} | ${String(
+          note?.summary || "No note summary",
         )}`,
       );
-    } else {
-      appointmentRows.push(`${patientName} (${row.owner}): No visits recorded yet`);
-      billingRows.push(`${patientName}: Balance $0.00 | No visits recorded`);
     }
 
-    const notes = Array.isArray(row.patient?.medicalNotes) ? row.patient.medicalNotes : [];
-    for (const note of notes.slice(0, 2)) {
-      const text = String(note?.text || "").replace(/\s+/g, " ").trim();
-      if (text) messageRows.push(`${patientName}: ${text}`);
-    }
-
-    const priorRecords = Array.isArray(row.patient?.priorRecords)
-      ? row.patient.priorRecords
+    const provided = Array.isArray(record?.clientProvidedRecords)
+      ? record.clientProvidedRecords
       : [];
-    for (const record of priorRecords.slice(0, 2)) {
-      const label =
-        String(record?.name || record?.filename || record?.title || "").trim() ||
-        "Attached record";
-      documentRows.push(`${patientName}: ${label}`);
+    for (const item of provided) {
+      clientRecordRows.push(`${patientName}: ${String(item || "Client record")}`);
+    }
+
+    const diagnostics = Array.isArray(record?.diagnostics) ? record.diagnostics : [];
+    for (const diagnostic of diagnostics) {
+      diagnosticRows.push(
+        `${patientName}: ${String(diagnostic?.visitDate || "Unknown date")} | ${String(
+          diagnostic?.label || "Diagnostic",
+        )} | ${String(diagnostic?.result || "Result pending")}`,
+      );
     }
   }
 
-  appointmentRows.sort((a, b) => a.localeCompare(b));
-  billingRows.sort((a, b) => a.localeCompare(b));
-
+  listItems(remindersEl, reminderRows.length ? reminderRows.slice(0, 20) : ["No reminders available."]);
   listItems(
-    appointmentsEl,
-    appointmentRows.length ? appointmentRows.slice(0, 16) : ["No appointments available."],
+    finalizedNotesEl,
+    finalizedNoteRows.length ? finalizedNoteRows.slice(0, 20) : ["No finalized medical notes available."],
+  );
+  listItems(patientInfoEl, patientInfoRows.length ? patientInfoRows.slice(0, 20) : ["No patient info available."]);
+  listItems(
+    clientRecordsEl,
+    clientRecordRows.length ? clientRecordRows.slice(0, 20) : ["No client-provided records available."],
   );
   listItems(
-    messagesEl,
-    messageRows.length ? messageRows.slice(0, 16) : ["No messages available."],
+    diagnosticsEl,
+    diagnosticRows.length ? diagnosticRows.slice(0, 20) : ["No diagnostics available."],
   );
-  listItems(
-    documentsEl,
-    documentRows.length ? documentRows.slice(0, 16) : ["No documents available."],
-  );
-
-  listItems(billingEl, billingRows.length ? billingRows.slice(0, 16) : ["No billing records available."]);
 
   accessScopeEl.textContent = String(payload?.scopeLabel || "Access scope unavailable");
 }
@@ -219,7 +183,7 @@ async function signIn(email, password) {
 
 async function hydrateFromToken(token) {
   const payload = await fetchPortalState(token);
-  renderDashboardFromState(payload);
+  renderDashboard(payload);
   showDashboard();
 }
 

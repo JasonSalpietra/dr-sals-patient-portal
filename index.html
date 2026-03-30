@@ -6,7 +6,7 @@
     <title>Patient Portal | Dr Sals</title>
     <meta
       name="description"
-      content="Patient portal for appointments, billing, secure messages, and records."
+      content="Patient portal for reminders, finalized notes, diagnostics, weights, and client records."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -51,23 +51,28 @@
         <p id="accessScope" class="scope-note"></p>
         <div class="grid">
           <article class="panel card">
-            <h3>Upcoming Appointments</h3>
-            <ul id="appointments"></ul>
+            <h3>Reminders</h3>
+            <ul id="reminders"></ul>
           </article>
 
           <article class="panel card">
-            <h3>Billing Snapshot</h3>
-            <ul id="billing"></ul>
+            <h3>Finalized Medical Notes</h3>
+            <ul id="finalizedNotes"></ul>
           </article>
 
           <article class="panel card">
-            <h3>Secure Messages</h3>
-            <ul id="messages"></ul>
+            <h3>Patient Info (Weight)</h3>
+            <ul id="patientInfo"></ul>
           </article>
 
           <article class="panel card">
-            <h3>Documents</h3>
-            <ul id="documents"></ul>
+            <h3>Client-Provided Records</h3>
+            <ul id="clientRecords"></ul>
+          </article>
+
+          <article class="panel card">
+            <h3>Diagnostics</h3>
+            <ul id="diagnostics"></ul>
           </article>
         </div>
       </section>
