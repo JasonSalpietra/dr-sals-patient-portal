@@ -214,7 +214,7 @@ function renderPatientInfoItems(el, rows = []) {
   el.innerHTML = rows
     .map((row) => {
       const title = row.patientName;
-      const signalment = [row.species, row.breed, row.sex].filter(Boolean).join(" | ") || "No signalment";
+      const signalment = [speciesDisplayLabel(row.species), row.breed, row.sex].filter(Boolean).join(" | ") || "No signalment";
       const dobAgeParts = [];
       if (row.dobLabel) dobAgeParts.push(`DOB ${row.dobLabel}`);
       if (row.ageLabel) dobAgeParts.push(`Age ${row.ageLabel}`);
@@ -247,7 +247,7 @@ function renderFinalizedNoteItems(el, rows = []) {
         <div class="section-item-meta">
           <span class="section-item-pill">${esc(`Visit ${row.visitDate || "Unknown date"}`)}</span>
         </div>
-        <div class="section-item-body">${esc(row.summary || "No note summary")}</div>
+        <div class="section-item-body">${esc(normalizeSpeciesWords(row.summary || "No note summary"))}</div>
       </li>
     `)
     .join("");
@@ -290,7 +290,7 @@ function renderDiagnosticItems(el, rows = []) {
           <span class="section-item-pill">${esc(row.label || "Diagnostic")}</span>
           <span class="section-item-pill">${esc(`Date ${row.visitDate || "Unknown"}`)}</span>
         </div>
-        <div class="section-item-body">${esc(row.result || "Result pending")}</div>
+        <div class="section-item-body">${esc(normalizeSpeciesWords(row.result || "Result pending"))}</div>
       </li>
     `)
     .join("");
@@ -302,6 +302,12 @@ function speciesLabel(value) {
   if (normalized.includes("dog") || normalized.includes("canine")) return "Canine";
   if (normalized.includes("cat") || normalized.includes("feline")) return "Feline";
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function normalizeSpeciesWords(text = "") {
+  return String(text || "")
+    .replace(/\bdogs?\b/gi, "Canine")
+    .replace(/\bcats?\b/gi, "Feline");
 }
 
 function speciesDisplayLabel(value = "", fallback = "") {
@@ -465,7 +471,7 @@ function renderRecordExportRows(records) {
         <div class="export-row">
           <div class="export-row-head">
             <strong>${esc(record.patientName)}</strong>
-            <span class="muted">${esc([record.species, record.breed].filter(Boolean).join(" | ") || "No species/breed")}</span>
+            <span class="muted">${esc([speciesDisplayLabel(record.species), record.breed].filter(Boolean).join(" | ") || "No species/breed")}</span>
           </div>
           <div class="export-actions">
             <button class="export-btn" data-export-type="vaccine" data-record-index="${index}" type="button">Vaccine Record</button>
@@ -507,7 +513,7 @@ function renderPatientChooserRows(patients = []) {
       (patient) => `
         <button class="patient-select-btn" data-patient-key="${esc(patient.key)}" type="button">
           <span class="owner-name">${esc(patient.name)}</span>
-          <span class="owner-meta">${esc([patient.species, patient.breed].filter(Boolean).join(" | ") || "No species/breed")}</span>
+          <span class="owner-meta">${esc([speciesDisplayLabel(patient.species), patient.breed].filter(Boolean).join(" | ") || "No species/breed")}</span>
         </button>
       `,
     )
