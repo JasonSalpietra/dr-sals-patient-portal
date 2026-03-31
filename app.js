@@ -37,6 +37,7 @@ let selectedOwnerKey = "";
 let selectedPatientKey = "";
 let currentVetSignatures = [];
 let currentClientRecordAttachments = [];
+let currentFinalizedVisitPreviews = [];
 let currentAccessToken = "";
 let portalRefreshIntervalId = null;
 const PORTAL_REFRESH_MS = 30000;
@@ -236,20 +237,26 @@ function renderPatientInfoItems(el, rows = []) {
 
 function renderFinalizedNoteItems(el, rows = []) {
   if (!el) return;
+  currentFinalizedVisitPreviews = [];
   if (!rows.length) {
     listItems(el, ["No finalized medical notes available."]);
     return;
   }
   el.innerHTML = rows
-    .map((row) => `
-      <li class="section-item">
-        <div class="section-item-title">${esc(row.patientName)}</div>
-        <div class="section-item-meta">
-          <span class="section-item-pill">${esc(`Visit ${row.visitDate || "Unknown date"}`)}</span>
-        </div>
-        <div class="section-item-body">Visit recorded. Use Medical Record Export for details.</div>
-      </li>
-    `)
+    .map((row) => {
+      const hasPreview = Boolean(row?.preview && typeof row.preview === "object");
+      const previewIndex = hasPreview ? currentFinalizedVisitPreviews.push(row.preview) - 1 : -1;
+      return `
+        <li class="section-item">
+          <div class="section-item-title">${esc(row.patientName)}</div>
+          <div class="section-item-meta">
+            <span class="section-item-pill">${esc(`Visit ${row.visitDate || "Unknown date"}`)}</span>
+          </div>
+          <div class="section-item-body">Visit recorded. Use Medical Record Export for full download.</div>
+          ${hasPreview ? `<div class="section-item-actions"><button class="ghost record-download-btn" data-visit-preview-index="${previewIndex}" type="button">Open Visit Record</button></div>` : ""}
+        </li>
+      `;
+    })
     .join("");
 }
 
@@ -530,6 +537,7 @@ function renderDashboardContent(records = []) {
   const diagnosticRows = [];
 
   for (const record of records) {
+    const mappedRecordForViews = mapRecordToOneClickModel(record);
     const ownerName = String(record?.ownerName || "Unknown owner").trim();
     const patientName = String(record?.patientName || "Unnamed patient").trim();
     const species = String(record?.species || "").trim();
@@ -566,13 +574,32 @@ function renderDashboardContent(records = []) {
       });
     }
 
-    const notes = Array.isArray(record?.finalizedMedicalNotes) ? record.finalizedMedicalNotes : [];
-    for (const note of notes) {
-      finalizedNoteRows.push({
-        patientName,
-        visitDate: formatUiDate(note?.visitDate) || String(note?.visitDate || "Unknown date"),
-        summary: String(note?.summary || "No note summary"),
-      });
+    const finalizedVisits = Array.isArray(record?.finalizedVisits) ? record.finalizedVisits : [];
+    if (finalizedVisits.length) {
+      for (const visit of finalizedVisits) {
+        finalizedNoteRows.push({
+          patientName,
+          visitDate: formatUiDate(visit?.visitDate) || String(visit?.visitDate || "Unknown date"),
+          preview: {
+            client: mappedRecordForViews.client,
+            patient: mappedRecordForViews.patient,
+            visit: {
+              ...visit,
+              attachments: Array.isArray(visit?.attachments) ? visit.attachments : [],
+              vitals: visit?.vitals && typeof visit.vitals === "object" ? visit.vitals : {},
+              soap: visit?.soap && typeof visit.soap === "object" ? visit.soap : {},
+            },
+          },
+        });
+      }
+    } else {
+      const notes = Array.isArray(record?.finalizedMedicalNotes) ? record.finalizedMedicalNotes : [];
+      for (const note of notes) {
+        finalizedNoteRows.push({
+          patientName,
+          visitDate: formatUiDate(note?.visitDate) || String(note?.visitDate || "Unknown date"),
+        });
+      }
     }
 
     const providedDetailed = Array.isArray(record?.clientProvidedRecordsDetailed)
@@ -1418,6 +1445,31 @@ if (clientRecordsEl) {
       button.disabled = false;
       button.textContent = original;
     }
+  });
+}
+
+if (finalizedNotesEl) {
+  finalizedNotesEl.addEventListener("click", async (event) => {
+    const button = event.target.closest("button[data-visit-preview-index]");
+    if (!button) return;
+    const index = Number.parseInt(button.dataset.visitPreviewIndex || "", 10);
+    const preview = Number.isFinite(index) ? currentFinalizedVisitPreviews[index] : null;
+    if (!preview) {
+      setLoginError("Visit preview unavailable.");
+      return;
+    }
+    const html = renderMedicalSummaryReportHtml({
+      client: preview.client,
+      patient: preview.patient,
+      visit: preview.visit,
+    });
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      setLoginError("Popup blocked. Allow popups to open the visit record page.");
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   });
 }
 
