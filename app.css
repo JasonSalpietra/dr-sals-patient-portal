@@ -348,6 +348,29 @@ ul {
   resize: vertical;
 }
 
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 24, 43, 0.46);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 50;
+}
+
+.modal-card {
+  width: min(100%, 560px);
+  padding: 18px;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
 .export-row {
   display: grid;
   gap: 10px;

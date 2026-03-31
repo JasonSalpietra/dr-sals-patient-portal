@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="app.css?v=20260331-1" />
+    <link rel="stylesheet" href="app.css?v=20260331-2" />
   </head>
   <body>
     <main class="shell">
@@ -99,37 +99,7 @@
           <p class="muted export-intro">
             Request an appointment. This sends your request to the clinic email and logs it in OneClick.
           </p>
-          <form id="appointmentRequestForm" class="appointment-form">
-            <label>
-              Patient
-              <select id="appointmentPatient" required></select>
-            </label>
-            <label>
-              Preferred Date
-              <input id="appointmentDate" type="date" required />
-            </label>
-            <label>
-              Preferred Time Window
-              <input id="appointmentTimeWindow" type="text" placeholder="Morning, 10am-12pm, etc." required />
-            </label>
-            <label>
-              Contact Phone
-              <input id="appointmentPhone" type="text" placeholder="(###) ###-####" />
-            </label>
-            <label>
-              Contact Email
-              <input id="appointmentContactEmail" type="email" placeholder="you@email.com" />
-            </label>
-            <label>
-              Reason
-              <input id="appointmentReason" type="text" placeholder="Reason for visit" required />
-            </label>
-            <label>
-              Notes
-              <textarea id="appointmentNotes" rows="3" placeholder="Anything we should know?"></textarea>
-            </label>
-            <button class="primary" type="submit">Send Request</button>
-          </form>
+          <button id="appointmentRequestOpenBtn" class="ghost" type="button">Request Appointment</button>
           <p id="appointmentRequestStatus" class="muted"></p>
         </article>
 
@@ -142,6 +112,26 @@
         </article>
         </div>
       </section>
+
+      <div id="appointmentRequestModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="appointmentRequestModalTitle">
+        <div class="modal-card panel">
+          <div class="modal-head">
+            <h3 id="appointmentRequestModalTitle">Appointment Request</h3>
+            <button id="appointmentRequestCloseBtn" class="ghost" type="button">Close</button>
+          </div>
+          <form id="appointmentRequestForm" class="appointment-form">
+            <label>
+              Reason
+              <input id="appointmentReason" type="text" placeholder="Reason for visit" required />
+            </label>
+            <label>
+              Notes
+              <textarea id="appointmentNotes" rows="4" placeholder="Anything we should know?"></textarea>
+            </label>
+            <button class="primary" type="submit">Send Request</button>
+          </form>
+        </div>
+      </div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -156,6 +146,6 @@
         window.SUPABASE_ANON_KEY ||
         "sb_publishable_6Z6f9OfRPGWeFGxL5nc9iA_rr90KFek";
     </script>
-    <script src="app.js?v=20260331-1"></script>
+    <script src="app.js?v=20260331-2"></script>
   </body>
 </html>
