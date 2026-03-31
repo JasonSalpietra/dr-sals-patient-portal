@@ -334,6 +334,20 @@ ul {
   gap: 10px;
 }
 
+.appointment-form {
+  display: grid;
+  gap: 10px;
+}
+
+.appointment-form textarea {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+  background: #f8fbff;
+  resize: vertical;
+}
+
 .export-row {
   display: grid;
   gap: 10px;

@@ -95,6 +95,45 @@
         </div>
 
         <article class="panel export-panel">
+          <h3>Appointment Request</h3>
+          <p class="muted export-intro">
+            Request an appointment. This sends your request to the clinic email and logs it in OneClick.
+          </p>
+          <form id="appointmentRequestForm" class="appointment-form">
+            <label>
+              Patient
+              <select id="appointmentPatient" required></select>
+            </label>
+            <label>
+              Preferred Date
+              <input id="appointmentDate" type="date" required />
+            </label>
+            <label>
+              Preferred Time Window
+              <input id="appointmentTimeWindow" type="text" placeholder="Morning, 10am-12pm, etc." required />
+            </label>
+            <label>
+              Contact Phone
+              <input id="appointmentPhone" type="text" placeholder="(###) ###-####" />
+            </label>
+            <label>
+              Contact Email
+              <input id="appointmentContactEmail" type="email" placeholder="you@email.com" />
+            </label>
+            <label>
+              Reason
+              <input id="appointmentReason" type="text" placeholder="Reason for visit" required />
+            </label>
+            <label>
+              Notes
+              <textarea id="appointmentNotes" rows="3" placeholder="Anything we should know?"></textarea>
+            </label>
+            <button class="primary" type="submit">Send Request</button>
+          </form>
+          <p id="appointmentRequestStatus" class="muted"></p>
+        </article>
+
+        <article class="panel export-panel">
           <h3>Record Exports</h3>
           <p class="muted export-intro">
             Download vaccine record, rabies certificate, or full medical record export for each patient.

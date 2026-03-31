@@ -23,6 +23,15 @@ const patientInfoEl = document.getElementById("patientInfo");
 const clientRecordsEl = document.getElementById("clientRecords");
 const diagnosticsEl = document.getElementById("diagnostics");
 const recordExportsEl = document.getElementById("recordExports");
+const appointmentRequestForm = document.getElementById("appointmentRequestForm");
+const appointmentPatientSelect = document.getElementById("appointmentPatient");
+const appointmentDateInput = document.getElementById("appointmentDate");
+const appointmentTimeWindowInput = document.getElementById("appointmentTimeWindow");
+const appointmentPhoneInput = document.getElementById("appointmentPhone");
+const appointmentContactEmailInput = document.getElementById("appointmentContactEmail");
+const appointmentReasonInput = document.getElementById("appointmentReason");
+const appointmentNotesInput = document.getElementById("appointmentNotes");
+const appointmentRequestStatusEl = document.getElementById("appointmentRequestStatus");
 const ownerChooserEl = document.getElementById("ownerChooser");
 const ownerListEl = document.getElementById("ownerList");
 const ownerBackBtn = document.getElementById("ownerBackBtn");
@@ -642,8 +651,31 @@ function renderDashboardContent(records = []) {
   renderPatientInfoItems(patientInfoEl, patientInfoRows.slice(0, 20));
   renderClientRecordItems(clientRecordsEl, clientRecordRows.slice(0, 20));
   renderDiagnosticItems(diagnosticsEl, diagnosticRows.slice(0, 20));
+  renderAppointmentPatientOptions(records);
 
   renderRecordExportRows(records);
+}
+
+function renderAppointmentPatientOptions(records = []) {
+  if (!appointmentPatientSelect) return;
+  const options = records
+    .map((record) => ({
+      patientName: String(record?.patientName || "").trim(),
+      clientName: String(record?.ownerName || "").trim(),
+    }))
+    .filter((item) => item.patientName)
+    .filter((item, index, all) => all.findIndex((other) => other.patientName === item.patientName) === index);
+  appointmentPatientSelect.innerHTML = options.length
+    ? options
+      .map((item) => `<option value="${esc(item.patientName)}" data-client-name="${esc(item.clientName)}">${esc(item.patientName)}</option>`)
+      .join("")
+    : "<option value=''>No patient selected</option>";
+}
+
+function setAppointmentRequestStatus(message = "", isError = false) {
+  if (!appointmentRequestStatusEl) return;
+  appointmentRequestStatusEl.textContent = String(message || "");
+  appointmentRequestStatusEl.classList.toggle("error", Boolean(isError));
 }
 
 function renderPatientSelectionFlow(records = []) {
@@ -746,6 +778,7 @@ function showAuth() {
   if (patientChooserEl) patientChooserEl.classList.add("hidden");
   if (patientBackBtn) patientBackBtn.classList.add("hidden");
   if (ownerPortalContentEl) ownerPortalContentEl.classList.remove("hidden");
+  setAppointmentRequestStatus("");
 }
 
 async function fetchPortalState(token) {
@@ -1508,6 +1541,73 @@ if (patientBackBtn) {
     selectedPatientKey = "";
     if (!currentPortalPayload) return;
     renderDashboard(currentPortalPayload);
+  });
+}
+
+if (appointmentRequestForm) {
+  appointmentRequestForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentAccessToken) {
+      setAppointmentRequestStatus("Sign in again to send appointment request.", true);
+      return;
+    }
+    const selectedOption = appointmentPatientSelect?.selectedOptions?.[0] || null;
+    const patientName = String(selectedOption?.value || "").trim();
+    const clientName = String(selectedOption?.dataset?.clientName || "").trim();
+    const preferredDate = String(appointmentDateInput?.value || "").trim();
+    const preferredTimeWindow = String(appointmentTimeWindowInput?.value || "").trim();
+    const phone = String(appointmentPhoneInput?.value || "").trim();
+    const contactEmail = String(appointmentContactEmailInput?.value || "").trim();
+    const reason = String(appointmentReasonInput?.value || "").trim();
+    const notes = String(appointmentNotesInput?.value || "").trim();
+    if (!patientName || !preferredDate || !preferredTimeWindow || !reason) {
+      setAppointmentRequestStatus("Patient, preferred date, time window, and reason are required.", true);
+      return;
+    }
+    const submitButton = appointmentRequestForm.querySelector("button[type='submit']");
+    const originalLabel = submitButton?.textContent || "Send Request";
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = "Sending...";
+    }
+    setAppointmentRequestStatus("");
+    try {
+      const response = await fetch(`${ONECLICK_API_BASE}/api/patient-portal/appointment-request`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${String(currentAccessToken || "").trim()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          patientName,
+          clientName,
+          preferredDate,
+          preferredTimeWindow,
+          phone,
+          contactEmail,
+          reason,
+          notes,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(String(payload?.error || `Request failed (${response.status})`));
+      }
+      appointmentRequestForm.reset();
+      renderAppointmentPatientOptions(currentRecords);
+      setAppointmentRequestStatus(
+        payload?.emailed
+          ? "Appointment request sent to clinic email and logged in OneClick."
+          : "Appointment request logged in OneClick. Email delivery is not configured yet.",
+      );
+    } catch (error) {
+      setAppointmentRequestStatus(String(error?.message || "Could not submit request."), true);
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = originalLabel;
+      }
+    }
   });
 }
 
