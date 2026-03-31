@@ -247,7 +247,7 @@ function renderFinalizedNoteItems(el, rows = []) {
         <div class="section-item-meta">
           <span class="section-item-pill">${esc(`Visit ${row.visitDate || "Unknown date"}`)}</span>
         </div>
-        <div class="section-item-body">${esc(normalizeSpeciesWords(row.summary || "No note summary"))}</div>
+        <div class="section-item-body">Visit recorded. Use Medical Record Export for details.</div>
       </li>
     `)
     .join("");
